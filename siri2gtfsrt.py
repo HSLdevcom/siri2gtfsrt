@@ -12,9 +12,9 @@ import dateutil.parser
 import pytz
 import os
 
-HSL_URL = "http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL"
+HSL_URL = os.environ.get('HSL_URL', "http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL")
 
-JOLI_URL = "http://data.itsfactory.fi/journeys/api/1/vehicle-activity"
+JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
 
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
 
