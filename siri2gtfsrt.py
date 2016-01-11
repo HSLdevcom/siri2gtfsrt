@@ -38,6 +38,9 @@ def handle_siri(url):
         if route_id in ('1300', '1300V', '1300M' ):
             continue # No other information than location for metros
 
+        if route_id[0:4] in ('3001', '3002'):
+            continue # Train data is better at rata.digitraffic.fi
+
         if route_id[0] in ('k', 'K'):
             continue # Kutsuplus
 
