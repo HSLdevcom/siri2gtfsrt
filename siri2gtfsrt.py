@@ -16,6 +16,9 @@ HSL_URL = os.environ.get('HSL_URL', "http://dev.hsl.fi/siriaccess/vm/json?operat
 
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
 
+# Another GTFS-RT feed to merge the new HSL data into
+CHAIN_URL = os.environ.get('CHAIN_URL', "http://digitransit.fi/raildigitraffic2gtfsrt/hsl")
+
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
 
 
@@ -23,7 +26,33 @@ app = Flask(__name__)
 
 @app.route('/HSL')
 def hsl_data():
-    return handle_siri(HSL_URL)
+    try:
+        data1 = handle_chain(CHAIN_URL)
+    except:
+        pass
+
+    try:
+        data2 = handle_siri(HSL_URL)
+    except:
+        pass
+
+    if not data1 or not data1.entity:
+        msg = data2
+    elif not data2 or not data2.entity:
+        msg = data1
+    else:
+        data1.MergeFrom(data2)
+        msg = data1
+
+    if 'debug' in request.args:
+        return text_format.MessageToString(msg)
+    else:
+        return msg.SerializeToString()
+
+def handle_chain(url):
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.ParseFromString(urlopen(url).read())
+    return msg
 
 def handle_siri(url):
     siri_data = json.loads(urlopen(url).read().decode('utf-8'))['Siri']
@@ -74,11 +103,7 @@ def handle_siri(url):
         else:
             ent.trip_update.delay = vehicle['MonitoredVehicleJourney']['Delay']
 
-    if 'debug' in request.args:
-        return text_format.MessageToString(msg)
-    else:
-        return msg.SerializeToString()
-
+    return msg
 
 @app.route('/JOLI')
 def jore_data():
