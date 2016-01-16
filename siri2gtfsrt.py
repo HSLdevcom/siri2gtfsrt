@@ -11,6 +11,8 @@ import datetime
 import dateutil.parser
 import pytz
 import os
+import threading
+from traceback import print_exc
 
 HSL_URL = os.environ.get('HSL_URL', "http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL")
 
@@ -21,20 +23,44 @@ CHAIN_URL = os.environ.get('CHAIN_URL', "http://digitransit.fi/raildigitraffic2g
 
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
 
+class Poll(object):
+    def __init__(self, url, interval):
+        self.url = url
+        self.interval = interval
+        self.stopped = threading.Event()
+        self.result = None
+        thread = threading.Thread(target=self.run)
+        thread.daemon = True
+        thread.start()
+
+    def run(self):
+        while not self.stopped.wait(self.interval):
+            try:
+                self.result = urlopen(self.url).read()
+            except:
+                print_exc()
+
+HSL_poll = Poll(HSL_URL, 1)
+JOLI_poll = Poll(JOLI_URL, 10)
+CHAIN_poll = Poll(CHAIN_URL, 60)
 
 app = Flask(__name__)
 
 @app.route('/HSL')
 def hsl_data():
+    data1 = None
     try:
-        data1 = handle_chain(CHAIN_URL)
+        data1 = handle_chain(CHAIN_poll)
     except:
-        pass
+        if CHAIN_poll.result is not None:
+            print_exc()
 
+    data2 = None
     try:
-        data2 = handle_siri(HSL_URL)
+        data2 = handle_siri(HSL_poll)
     except:
-        pass
+        if HSL_poll.result is not None:
+            print_exc()
 
     if not data1 or not data1.entity:
         msg = data2
@@ -49,13 +75,13 @@ def hsl_data():
     else:
         return msg.SerializeToString()
 
-def handle_chain(url):
+def handle_chain(poll):
     msg = gtfs_realtime_pb2.FeedMessage()
-    msg.ParseFromString(urlopen(url).read())
+    msg.ParseFromString(poll.result)
     return msg
 
-def handle_siri(url):
-    siri_data = json.loads(urlopen(url).read().decode('utf-8'))['Siri']
+def handle_siri(poll):
+    siri_data = json.loads(poll.result.decode('utf-8'))['Siri']
     msg = gtfs_realtime_pb2.FeedMessage()
     msg.header.gtfs_realtime_version = "1.0"
     msg.header.incrementality = msg.header.FULL_DATASET
@@ -107,10 +133,10 @@ def handle_siri(url):
 
 @app.route('/JOLI')
 def jore_data():
-    return handle_journeys(JOLI_URL)
+    return handle_journeys(JOLI_poll)
 
-def handle_journeys(url):
-    journeys_data = json.loads(urlopen(url).read().decode('utf-8'))
+def handle_journeys(poll):
+    journeys_data = json.loads(poll.result.decode('utf-8'))
     if journeys_data['status'] != "success":
         abort(500)
     msg = gtfs_realtime_pb2.FeedMessage()
