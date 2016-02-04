@@ -69,8 +69,7 @@ def hsl_data():
     try:
         handle_trip_update(msg, TRIP_UPDATE_poll)
     except:
-        if TRIP_UPDATE_poll.result is not None:
-            print_exc()
+        print_exc()
 
     if 'debug' in request.args:
         return text_format.MessageToString(msg)
@@ -82,7 +81,8 @@ def handle_trip_update(orig_msg, poll):
     msg.ParseFromString(poll.result)
     for entity in msg.entity:
         if entity.HasField('trip_update'):
-            orig_msg.entity.add(entity)
+            new_entity = orig_msg.entity.add()
+            new_entity.CopyFrom(entity)
 
 
 def handle_chain(poll):
