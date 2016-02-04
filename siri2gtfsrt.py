@@ -20,6 +20,7 @@ JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/
 
 # Another GTFS-RT feed to merge the new HSL data into
 CHAIN_URL = os.environ.get('CHAIN_URL', "http://digitransit.fi/raildigitraffic2gtfsrt/hsl")
+TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://digitransit.fi/hsl-alert")
 
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
 
@@ -43,37 +44,46 @@ class Poll(object):
 HSL_poll = Poll(HSL_URL, 1)
 JOLI_poll = Poll(JOLI_URL, 10)
 CHAIN_poll = Poll(CHAIN_URL, 60)
+TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60)
 
 app = Flask(__name__)
 
 @app.route('/HSL')
 def hsl_data():
-    data1 = None
+    msg = gtfs_realtime_pb2.FeedMessage()
+
     try:
         data1 = handle_chain(CHAIN_poll)
+        msg.MergeFrom(data1)
     except:
         if CHAIN_poll.result is not None:
             print_exc()
 
-    data2 = None
     try:
         data2 = handle_siri(HSL_poll)
+        msg.MergeFrom(data2)
     except:
         if HSL_poll.result is not None:
             print_exc()
 
-    if not data1 or not data1.entity:
-        msg = data2
-    elif not data2 or not data2.entity:
-        msg = data1
-    else:
-        data1.MergeFrom(data2)
-        msg = data1
+    try:
+        handle_trip_update(msg, TRIP_UPDATE_poll)
+    except:
+        if TRIP_UPDATE_poll.result is not None:
+            print_exc()
 
     if 'debug' in request.args:
         return text_format.MessageToString(msg)
     else:
         return msg.SerializeToString()
+
+def handle_trip_update(orig_msg, poll):
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.ParseFromString(poll.result)
+    for entity in msg.entity:
+        if entity.HasField('trip_update'):
+            orig_msg.entity.add(entity)
+
 
 def handle_chain(poll):
     msg = gtfs_realtime_pb2.FeedMessage()
@@ -111,7 +121,7 @@ def handle_siri(poll):
         if 'DatedVehicleJourneyRef' in vehicle['MonitoredVehicleJourney']['FramedVehicleJourneyRef']:
             start_time = vehicle['MonitoredVehicleJourney']['FramedVehicleJourneyRef']['DatedVehicleJourneyRef']
             ent.trip_update.trip.start_time = start_time[:2]+":"+start_time[2:]+":00"
-        
+
         if 'DirectionRef' in vehicle['MonitoredVehicleJourney'] and 'value' in vehicle['MonitoredVehicleJourney']['DirectionRef']:
             ent.trip_update.trip.direction_id = int(vehicle['MonitoredVehicleJourney']['DirectionRef']['value'])-1
 
