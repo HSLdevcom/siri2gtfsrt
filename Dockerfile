@@ -2,8 +2,6 @@ FROM python:2
 MAINTAINER Reittiopas version: 0.1
 
 RUN \
-  apt-get update && \
-  apt-get install -y python-pip && \
   pip install transitfeed && \
   pip install protobuf && \
   pip install flask && \
