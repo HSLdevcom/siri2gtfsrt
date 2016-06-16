@@ -14,84 +14,54 @@ import os
 import threading
 from traceback import print_exc
 
-HSL_URL = os.environ.get('HSL_URL', "http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL")
-
+#Tampere realtinme siri feed
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
-
-# Another GTFS-RT feed to merge the new HSL data into
-CHAIN_URL = os.environ.get('CHAIN_URL', "http://digitransit.fi/raildigitraffic2gtfsrt/hsl")
-TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://digitransit.fi/hsl-alert")
+# HSL realtime siri feed
+HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
+# HSL area train GTFS-RT feed to merge the HSL data into
+TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
+# HSL area service-alerts GTFS-RT feed
+TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://api.digitransit.fi/realtime/service-alerts/v1/")
 
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
 
+#global data
+ctx = {"msg" : gtfs_realtime_pb2.FeedMessage()}
+
 class Poll(object):
-    def __init__(self, url, interval):
+    def __init__(self, url, interval, fn, preprocess = False):
         self.url = url
         self.interval = interval
         self.stopped = threading.Event()
         self.result = None
+        self.fn = fn
+        self.preprocess = preprocess
         thread = threading.Thread(target=self.run)
         thread.daemon = True
         thread.start()
 
     def run(self):
-        while not self.stopped.wait(self.interval):
+        while True:
             try:
-                self.result = urlopen(self.url).read()
+                print "fetching data from ", self.url
+
+                result = urlopen(self.url, timeout = 60).read()
+                if self.fn is not None:
+                    print "processing url", self.url
+                    self.result = self.fn(result)
+                else:
+                    print "storing content", self.url
+                    self.result = result
+                if self.preprocess:
+                    print "calling preprocess", self.url
+                    process_hsl_data()
             except:
                 print_exc()
 
-HSL_poll = Poll(HSL_URL, 1)
-JOLI_poll = Poll(JOLI_URL, 10)
-CHAIN_poll = Poll(CHAIN_URL, 60)
-TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60)
+            self.stopped.wait(self.interval)
 
-app = Flask(__name__)
-
-@app.route('/HSL')
-def hsl_data():
-    msg = gtfs_realtime_pb2.FeedMessage()
-
-    try:
-        data1 = handle_chain(CHAIN_poll)
-        msg.MergeFrom(data1)
-    except:
-        if CHAIN_poll.result is not None:
-            print_exc()
-
-    try:
-        data2 = handle_siri(HSL_poll)
-        msg.MergeFrom(data2)
-    except:
-        if HSL_poll.result is not None:
-            print_exc()
-
-    try:
-        handle_trip_update(msg, TRIP_UPDATE_poll)
-    except:
-        print_exc()
-
-    if 'debug' in request.args:
-        return text_format.MessageToString(msg)
-    else:
-        return msg.SerializeToString()
-
-def handle_trip_update(orig_msg, poll):
-    msg = gtfs_realtime_pb2.FeedMessage()
-    msg.ParseFromString(poll.result)
-    for entity in msg.entity:
-        if entity.HasField('trip_update'):
-            new_entity = orig_msg.entity.add()
-            new_entity.CopyFrom(entity)
-
-
-def handle_chain(poll):
-    msg = gtfs_realtime_pb2.FeedMessage()
-    msg.ParseFromString(poll.result)
-    return msg
-
-def handle_siri(poll):
-    siri_data = json.loads(poll.result.decode('utf-8'))['Siri']
+def handle_siri(raw):
+    siri_data = json.loads(raw.decode('utf-8'))['Siri']
     msg = gtfs_realtime_pb2.FeedMessage()
     msg.header.gtfs_realtime_version = "1.0"
     msg.header.incrementality = msg.header.FULL_DATASET
@@ -112,10 +82,19 @@ def handle_siri(poll):
         if 'Delay' not in vehicle['MonitoredVehicleJourney']:
             continue
 
+
         ent = msg.entity.add()
         ent.id = str(i)
         ent.trip_update.timestamp = vehicle['RecordedAtTime']/1000
         ent.trip_update.trip.route_id = route_id
+
+        try:
+            int(vehicle['MonitoredVehicleJourney']['Delay'])
+        except:
+            print_exc()
+            print vehicle, vehicle['MonitoredVehicleJourney']['Delay']
+
+            continue
 
         ent.trip_update.trip.start_date = vehicle['MonitoredVehicleJourney']['FramedVehicleJourneyRef']['DataFrameRef']['value'].replace("-","")
         if 'DatedVehicleJourneyRef' in vehicle['MonitoredVehicleJourney']['FramedVehicleJourneyRef']:
@@ -135,18 +114,31 @@ def handle_siri(poll):
                 stoptime.stop_id = vehicle['MonitoredVehicleJourney']['MonitoredCall']['StopPointRef']
             elif 'Order' in vehicle['MonitoredVehicleJourney']['MonitoredCall']:
                 stoptime.stop_sequence = vehicle['MonitoredVehicleJourney']['MonitoredCall']['Order']
-            stoptime.arrival.delay = vehicle['MonitoredVehicleJourney']['Delay']
+            stoptime.arrival.delay = int(vehicle['MonitoredVehicleJourney']['Delay'])
         else:
-            ent.trip_update.delay = vehicle['MonitoredVehicleJourney']['Delay']
+            ent.trip_update.delay = int(vehicle['MonitoredVehicleJourney']['Delay'])
 
     return msg
 
-@app.route('/JOLI')
-def jore_data():
-    return handle_journeys(JOLI_poll)
+def handle_trip_update(orig_msg, alerts):
+    if alerts == None:
+        return
 
-def handle_journeys(poll):
-    journeys_data = json.loads(poll.result.decode('utf-8'))
+    for entity in alerts.entity:
+        if entity.HasField('trip_update'):
+            new_entity = orig_msg.entity.add()
+            new_entity.CopyFrom(entity)
+
+def parse_gtfsrt(raw):
+    if raw == None:
+        return None
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.ParseFromString(raw)
+
+    return msg
+
+def handle_journeys(raw):
+    journeys_data = json.loads(raw.decode('utf-8'))
     if journeys_data['status'] != "success":
         abort(500)
     msg = gtfs_realtime_pb2.FeedMessage()
@@ -181,7 +173,48 @@ def handle_journeys(poll):
             stoptime.arrival.time = int(arrival_time)
             departure_time = (dateutil.parser.parse(call['expectedDepartureTime']) - EPOCH).total_seconds()
             stoptime.departure.time = int(departure_time)
+    return msg
 
+# data is processed asynchronously as new data come in
+def process_hsl_data():
+    try:
+        if TRAIN_poll.result is not None:
+            ctx["nmsg"] = TRAIN_poll.result
+        else:
+           ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
+    except:
+        print_exc()
+
+    try:
+        if HSL_poll.result is not None:
+            ctx["nmsg"].MergeFrom(HSL_poll.result)
+    except:
+        print_exc()
+
+    try:
+        if TRIP_UPDATE_poll.result is not None:
+            handle_trip_update(ctx["nmsg"], TRIP_UPDATE_poll.result)
+    except:
+        print_exc()
+
+    ctx["msg"] = ctx["nmsg"];
+
+HSL_poll = Poll(HSL_URL, 60, handle_siri, True)
+JOLI_poll = Poll(JOLI_URL, 60, handle_journeys, False)
+TRAIN_poll = Poll(TRAIN_URL, 60, parse_gtfsrt, True)
+TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, parse_gtfsrt, True)
+
+app = Flask(__name__)
+
+@app.route('/JOLI')
+def jore_data():
+    return toString(JOLI_poll.result)
+
+@app.route('/HSL')
+def hsl_data():
+    return toString(ctx["msg"]);
+
+def toString(msg):
     if 'debug' in request.args:
         return text_format.MessageToString(msg)
     else:
