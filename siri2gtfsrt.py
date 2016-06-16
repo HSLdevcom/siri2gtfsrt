@@ -14,11 +14,13 @@ import os
 import threading
 from traceback import print_exc
 
-HSL_URL = os.environ.get('HSL_URL', "http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL")
+#Tampere realtinme siri feed
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
-
-# Another GTFS-RT feed to merge the new HSL data into
-CHAIN_URL = os.environ.get('CHAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
+# HSL realtime siri feed
+HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
+# HSL area train GTFS-RT feed to merge the HSL data into
+TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
+# HSL area service-alerts GTFS-RT feed
 TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://api.digitransit.fi/realtime/service-alerts/v1/")
 
 EPOCH = datetime.datetime(1970, 1, 1, tzinfo=pytz.utc)
@@ -176,9 +178,8 @@ def handle_journeys(raw):
 # data is processed asynchronously as new data come in
 def process_hsl_data():
     try:
-        #data1 = parse_gtfsrt(CHAIN_poll.result)
-        if CHAIN_poll.result is not None:
-            ctx["nmsg"] = CHAIN_poll.result
+        if TRAIN_poll.result is not None:
+            ctx["nmsg"] = TRAIN_poll.result
         else:
            ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
     except:
@@ -200,7 +201,7 @@ def process_hsl_data():
 
 HSL_poll = Poll(HSL_URL, 60, handle_siri, True)
 JOLI_poll = Poll(JOLI_URL, 60, handle_journeys, False)
-CHAIN_poll = Poll(CHAIN_URL, 60, parse_gtfsrt, True)
+TRAIN_poll = Poll(TRAIN_URL, 60, parse_gtfsrt, True)
 TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, parse_gtfsrt, True)
 
 app = Flask(__name__)
