@@ -15,7 +15,8 @@ ADD . ${DIR_PATH}
 
 ENV CHAIN_URL=http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl
 ENV TRIP_UPDATE_URL=http://api.digitransit.fi/realtime/service-alerts/v1/
-ENV HSL_URL=http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json?operatorRef=HSL
+ENV HSL_URL=http://dev.hsl.fi/siriaccess/vm/json?operatorRef=HSL
+ENV JOLI_URL=http://data.itsfactory.fi/journeys/api/1/vehicle-activity
 ENV PORT=8080
 EXPOSE ${PORT}
 
