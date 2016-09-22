@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import logging
+
 import gtfs_realtime_pb2
 from google.protobuf import text_format
 from flask import Flask
@@ -7,11 +9,13 @@ from flask import request
 from urllib2 import urlopen
 import os
 import threading
-from traceback import print_exc
 
 import hsl
 import foli
 import gtfs
+
+
+logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO'))
 
 # Tampere realtinme siri feed
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
@@ -41,20 +45,20 @@ class Poll(object):
     def run(self):
         while True:
             try:
-                print "fetching data from ", self.url
+                logging.debug("fetching data from %s", self.url)
 
                 result = urlopen(self.url, timeout = 60).read()
                 if self.fn is not None:
-                    print "processing url", self.url
+                    logging.debug("processing url %s", self.url)
                     self.result = self.fn(result)
                 else:
-                    print "storing content", self.url
+                    logging.debug("storing content %s", self.url)
                     self.result = result
                 if self.preprocess:
-                    print "calling preprocess", self.url
+                    logging.debug("calling preprocess %s", self.url)
                     process_hsl_data()
             except:
-                print_exc()
+                logging.exception("fetching %s failed", self.url)
 
             self.stopped.wait(self.interval)
 
@@ -75,19 +79,19 @@ def process_hsl_data():
         else:
            ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
     except:
-        print_exc()
+        logging.exception("processing hsl train data failed")
 
     try:
         if HSL_poll.result is not None:
             ctx["nmsg"].MergeFrom(HSL_poll.result)
     except:
-        print_exc()
+        logging.exception("processing hsl data failed")
 
     try:
         if TRIP_UPDATE_poll.result is not None:
             handle_trip_update(ctx["nmsg"], TRIP_UPDATE_poll.result)
     except:
-        print_exc()
+        logging.exception("processing hsl trip updates failed")
 
     ctx["msg"] = ctx["nmsg"];
 
