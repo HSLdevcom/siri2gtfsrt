@@ -17,7 +17,7 @@ import gtfs
 
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO'))
 
-# Tampere realtinme siri feed
+# Tampere realtime siri feed
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
 # HSL realtime siri feed
 HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
@@ -27,11 +27,12 @@ TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/rail
 TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://api.digitransit.fi/realtime/service-alerts/v1/")
 
 
-#global data
-ctx = {"msg" : gtfs_realtime_pb2.FeedMessage()}
+# global data
+ctx = {"msg": gtfs_realtime_pb2.FeedMessage()}
+
 
 class Poll(object):
-    def __init__(self, url, interval, fn, preprocess = False):
+    def __init__(self, url, interval, fn, preprocess=False):
         self.url = url
         self.interval = interval
         self.stopped = threading.Event()
@@ -47,7 +48,7 @@ class Poll(object):
             try:
                 logging.debug("fetching data from %s", self.url)
 
-                result = urlopen(self.url, timeout = 60).read()
+                result = urlopen(self.url, timeout=60).read()
                 if self.fn is not None:
                     logging.debug("processing url %s", self.url)
                     self.result = self.fn(result)
@@ -62,8 +63,9 @@ class Poll(object):
 
             self.stopped.wait(self.interval)
 
+
 def handle_trip_update(orig_msg, alerts):
-    if alerts == None:
+    if alerts is None:
         return
 
     for entity in alerts.entity:
@@ -71,13 +73,14 @@ def handle_trip_update(orig_msg, alerts):
             new_entity = orig_msg.entity.add()
             new_entity.CopyFrom(entity)
 
+
 # data is processed asynchronously as new data come in
 def process_hsl_data():
     try:
         if TRAIN_poll.result is not None:
             ctx["nmsg"] = TRAIN_poll.result
         else:
-           ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
+            ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
     except:
         logging.exception("processing hsl train data failed")
 
@@ -93,7 +96,7 @@ def process_hsl_data():
     except:
         logging.exception("processing hsl trip updates failed")
 
-    ctx["msg"] = ctx["nmsg"];
+    ctx["msg"] = ctx["nmsg"]
 
 HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, True)
 JOLI_poll = Poll(JOLI_URL, 60, foli.handle_journeys, False)
@@ -102,13 +105,16 @@ TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, True)
 
 app = Flask(__name__)
 
+
 @app.route('/JOLI')
 def jore_data():
     return toString(JOLI_poll.result)
 
+
 @app.route('/HSL')
 def hsl_data():
-    return toString(ctx["msg"]);
+    return toString(ctx["msg"])
+
 
 def toString(msg):
     if 'debug' in request.args:
