@@ -28,7 +28,7 @@ TRIP_UPDATE_URL = os.environ.get('TRIP_UPDATE_URL', "http://api.digitransit.fi/r
 
 
 # global data
-ctx = {"msg": gtfs_realtime_pb2.FeedMessage()}
+hsl_msg = gtfs_realtime_pb2.FeedMessage()
 
 
 class Poll(object):
@@ -76,30 +76,42 @@ def handle_trip_update(orig_msg, alerts):
 
 # data is processed asynchronously as new data come in
 def process_hsl_data():
+    nmsg = gtfs_realtime_pb2.FeedMessage()
     try:
+        # WARNING Race condition:
+        #         the result might be changed between the if and the next line
         if TRAIN_poll.result is not None:
-            ctx["nmsg"] = TRAIN_poll.result
-        else:
-            ctx["nmsg"] = gtfs_realtime_pb2.FeedMessage()
+            nmsg.MergeFrom(TRAIN_poll.result)
     except:
         logging.exception("processing hsl train data failed")
 
     try:
+        # WARNING Race condition:
+        #         the result might be changed between the if and the next line
         if HSL_poll.result is not None:
-            ctx["nmsg"].MergeFrom(HSL_poll.result)
+            nmsg.MergeFrom(HSL_poll.result)
     except:
         logging.exception("processing hsl data failed")
 
     try:
+        # WARNING Race condition:
+        #         the result might be changed between the if and the next line
         if TRIP_UPDATE_poll.result is not None:
-            handle_trip_update(ctx["nmsg"], TRIP_UPDATE_poll.result)
+            handle_trip_update(nmsg, TRIP_UPDATE_poll.result)
     except:
         logging.exception("processing hsl trip updates failed")
 
-    ctx["msg"] = ctx["nmsg"]
+    # WARNING Race condition: The GIL in CPython guarantees this works,
+    #                         but other implementations might need atomic locks
+    global hsl_msg
+    hsl_msg = nmsg
 
-HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, True)
 JOLI_poll = Poll(JOLI_URL, 60, foli.handle_journeys, False)
+
+
+# TODO Does every thread need to preprocess, or would one be good enough?
+#      Would lessen the workload to 1/3, but increase update latency for other two
+HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, True)
 TRAIN_poll = Poll(TRAIN_URL, 60, gtfs.parse_gtfsrt, True)
 TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, True)
 
@@ -113,7 +125,7 @@ def jore_data():
 
 @app.route('/HSL')
 def hsl_data():
-    return toString(ctx["msg"])
+    return toString(hsl_msg)
 
 
 def toString(msg):
