@@ -9,9 +9,12 @@ from flask import request
 from urllib2 import urlopen
 import os
 import threading
+from StringIO import StringIO
+import gzip
 
-import hsl
 import foli
+import hsl
+import joli
 import gtfs
 
 
@@ -19,6 +22,8 @@ logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO'))
 
 # Tampere realtime siri feed
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
+# Turku realtime siri feed
+FOLI_URL = os.environ.get('FOLI_URL', "http://data.foli.fi/siri/vm")
 # HSL realtime siri feed
 HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
 # HSL area train GTFS-RT feed to merge the HSL data into
@@ -32,13 +37,14 @@ hsl_msg = gtfs_realtime_pb2.FeedMessage()
 
 
 class Poll(object):
-    def __init__(self, url, interval, fn, preprocess=False):
+    def __init__(self, url, interval, fn, preprocess=False, gzipped=False):
         self.url = url
         self.interval = interval
         self.stopped = threading.Event()
         self.result = None
         self.fn = fn
         self.preprocess = preprocess
+        self.gzipped = gzipped
         thread = threading.Thread(target=self.run)
         thread.daemon = True
         thread.start()
@@ -49,6 +55,8 @@ class Poll(object):
                 logging.debug("fetching data from %s", self.url)
 
                 result = urlopen(self.url, timeout=60).read()
+                if self.gzipped:
+                    result = gzip.GzipFile(fileobj=StringIO(result)).read()
                 if self.fn is not None:
                     logging.debug("processing url %s", self.url)
                     self.result = self.fn(result)
@@ -106,21 +114,27 @@ def process_hsl_data():
     global hsl_msg
     hsl_msg = nmsg
 
-JOLI_poll = Poll(JOLI_URL, 60, foli.handle_journeys, False)
+JOLI_poll = Poll(JOLI_URL, 60, joli.handle_journeys)
+FOLI_poll = Poll(FOLI_URL, 60, foli.handle_journeys, gzipped=True)
 
 
 # TODO Does every thread need to preprocess, or would one be good enough?
 #      Would lessen the workload to 1/3, but increase update latency for other two
-HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, True)
-TRAIN_poll = Poll(TRAIN_URL, 60, gtfs.parse_gtfsrt, True)
-TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, True)
+HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, preprocess=True)
+TRAIN_poll = Poll(TRAIN_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
+TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
 
 app = Flask(__name__)
 
 
 @app.route('/JOLI')
-def jore_data():
+def tampere_data():
     return toString(JOLI_poll.result)
+
+
+@app.route('/FOLI')
+def turku_data():
+    return toString(FOLI_poll.result)
 
 
 @app.route('/HSL')
