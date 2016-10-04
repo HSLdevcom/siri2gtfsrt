@@ -7,7 +7,7 @@ import zipfile
 
 from gtfs_realtime_pb2 import FeedMessage, VehiclePosition
 
-GTFS_URL = 'http://data.foli.fi/gtfs/gtfs.zip'
+GTFS_URL = 'http://dev.hsl.fi/gtfs.foli/foli.zip'
 
 zipdata = StringIO()
 zipdata.write(urlopen(GTFS_URL).read())
