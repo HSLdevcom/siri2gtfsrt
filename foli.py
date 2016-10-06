@@ -44,8 +44,9 @@ def handle_journeys(raw):
         ent.trip_update.trip.start_date = start.strftime('%Y%m%d')
         ent.trip_update.trip.start_time = start.strftime('%H:%M:%S')
         ent.trip_update.trip.route_id = shortname_to_routeid(vehicle['lineref'])
-        # The feed has 1 and 2 as direction values
-        ent.trip_update.trip.direction_id = int(vehicle['directionref']) - 1
+        # The feed has 1 and 2 as direction values.
+        # FOLI uses the opposite logic from HSL or Tampere: 2 is GTFS 0 and 1 is GTFS 1
+        ent.trip_update.trip.direction_id = (int(vehicle['directionref']) - 2) % 2
 
         # vehicleref isn't user friendly, but the same numbers seem to exist from day to day
         ent.trip_update.vehicle.id = vehicle['vehicleref']
