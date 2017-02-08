@@ -4,10 +4,12 @@ import logging
 from StringIO import StringIO
 from urllib2 import urlopen
 import zipfile
+import pytz
 
 from gtfs_realtime_pb2 import FeedMessage, VehiclePosition
 
 GTFS_URL = 'http://dev.hsl.fi/gtfs.foli/foli.zip'
+gtfs_timezone = pytz.timezone("Europe/Helsinki")
 
 zipdata = StringIO()
 zipdata.write(urlopen(GTFS_URL).read())
@@ -40,7 +42,7 @@ def handle_journeys(raw):
 
         ent.trip_update.timestamp = vehicle['recordedattime']
 
-        start = datetime.fromtimestamp(vehicle['originaimeddeparturetime'])
+        start = datetime.fromtimestamp(vehicle['originaimeddeparturetime'], gtfs_timezone)
         ent.trip_update.trip.start_date = start.strftime('%Y%m%d')
         ent.trip_update.trip.start_time = start.strftime('%H:%M:%S')
         ent.trip_update.trip.route_id = shortname_to_routeid(vehicle['lineref'])
