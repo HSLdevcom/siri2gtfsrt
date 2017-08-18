@@ -15,7 +15,7 @@ function tagandpush {
 
 if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
 
-  docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_AUTH
+  docker login -u $DOCKER_USER -p $DOCKER_AUTH
   if [ "$TRAVIS_TAG" ];then
     echo "processing release $TRAVIS_TAG"
     #release do not rebuild, just tag
