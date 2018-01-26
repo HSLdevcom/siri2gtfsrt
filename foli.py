@@ -5,6 +5,8 @@ from StringIO import StringIO
 from urllib2 import urlopen
 import zipfile
 import pytz
+import csv
+import pprint
 
 from gtfs_realtime_pb2 import FeedMessage, VehiclePosition
 
@@ -17,10 +19,15 @@ myzipfile = zipfile.ZipFile(zipdata)
 
 routes = {}
 with myzipfile.open('routes.txt') as route_file:
-    for line in route_file:
-        parts = line.split(',')
-        routes[parts[2]] = parts[0]
+    routesreader = csv.reader(route_file, delimiter=',', quotechar='"')
+    header = None
+    for parts in routesreader:
+        if not header:
+            header = parts
+            continue
 
+        routeinfo = dict(zip(header,parts))
+        routes[routeinfo['route_short_name']] = routeinfo['route_id']
 
 def shortname_to_routeid(shortname):
     return routes[shortname]
