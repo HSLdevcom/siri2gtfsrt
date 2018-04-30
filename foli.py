@@ -60,6 +60,7 @@ def handle_journeys(raw):
 
         if len(fields_not_found) > 0:
             logging.error("Fields missing from FOLI vehicle %s (%s)" % (i, ', '.join(fields_not_found)))
+            continue
 
         ent = msg.entity.add()
         ent.id = i
