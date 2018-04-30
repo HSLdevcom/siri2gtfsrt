@@ -26,11 +26,17 @@ with myzipfile.open('routes.txt') as route_file:
             header = parts
             continue
 
-        routeinfo = dict(zip(header,parts))
+        routeinfo = dict(zip(header, parts))
         routes[routeinfo['route_short_name']] = routeinfo['route_id']
+
 
 def shortname_to_routeid(shortname):
     return routes[shortname]
+
+
+required_fields = ('monitored', 'recordedattime', 'originaimeddeparturetime', 'lineref', 'directionref', 'vehicleref',
+                   'next_stoppointref', 'next_expectedarrivaltime', 'next_expecteddeparturetime', 'latitude',
+                   'longitude', 'inpanic', 'incongestion')
 
 
 def handle_journeys(raw):
@@ -44,6 +50,18 @@ def handle_journeys(raw):
     msg.header.timestamp = int(data['servertime'])
 
     for i, vehicle in data['result']['vehicles'].iteritems():
+        if 'monitored' not in vehicle or not vehicle['monitored']:
+            continue
+
+        fields_not_found = []
+        for rf in required_fields:
+            if rf not in vehicle:
+                fields_not_found.append(rf)
+
+        if len(fields_not_found) > 0:
+            logging.error("Fields missing from FOLI vehicle %s (%s)" % (i, ', '.join(fields_not_found)))
+            continue
+
         ent = msg.entity.add()
         ent.id = i
 
