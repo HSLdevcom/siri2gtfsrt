@@ -24,8 +24,6 @@ logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO'))
 JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
 # Turku realtime siri feed
 FOLI_URL = os.environ.get('FOLI_URL', "http://data.foli.fi/siri/vm")
-# HSL realtime siri feed
-HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
 # HSL area train GTFS-RT feed to merge the HSL data into
 TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
 # HSL area service-alerts GTFS-RT feed
@@ -96,14 +94,6 @@ def process_hsl_data():
     try:
         # WARNING Race condition:
         #         the result might be changed between the if and the next line
-        if HSL_poll.result is not None:
-            nmsg.MergeFrom(HSL_poll.result)
-    except:
-        logging.exception("processing hsl data failed")
-
-    try:
-        # WARNING Race condition:
-        #         the result might be changed between the if and the next line
         if TRIP_UPDATE_poll.result is not None:
             handle_trip_update(nmsg, TRIP_UPDATE_poll.result)
     except:
@@ -120,7 +110,7 @@ FOLI_poll = Poll(FOLI_URL, 60, foli.handle_journeys, gzipped=True)
 
 # TODO Does every thread need to preprocess, or would one be good enough?
 #      Would lessen the workload to 1/3, but increase update latency for other two
-HSL_poll = Poll(HSL_URL, 60, hsl.handle_siri, preprocess=True)
+
 TRAIN_poll = Poll(TRAIN_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
 TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
 
