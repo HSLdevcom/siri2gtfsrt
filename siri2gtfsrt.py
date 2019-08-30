@@ -14,18 +14,15 @@ import gzip
 
 import foli
 import hsl
-import joli
 import gtfs
 
 
 logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO'))
 
-# Tampere realtime siri feed
-JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/vehicle-activity")
 # Turku realtime siri feed
 FOLI_URL = os.environ.get('FOLI_URL', "http://data.foli.fi/siri/vm")
 # HSL realtime siri feed
-HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
+HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json?operatorRef=HSL")
 # HSL area train GTFS-RT feed to merge the HSL data into
 TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
 # HSL area service-alerts GTFS-RT feed
@@ -114,7 +111,6 @@ def process_hsl_data():
     global hsl_msg
     hsl_msg = nmsg
 
-JOLI_poll = Poll(JOLI_URL, 60, joli.handle_journeys)
 FOLI_poll = Poll(FOLI_URL, 60, foli.handle_journeys, gzipped=True)
 
 
@@ -125,11 +121,6 @@ TRAIN_poll = Poll(TRAIN_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
 TRIP_UPDATE_poll = Poll(TRIP_UPDATE_URL, 60, gtfs.parse_gtfsrt, preprocess=True)
 
 app = Flask(__name__)
-
-
-@app.route('/JOLI')
-def tampere_data():
-    return toString(JOLI_poll.result)
 
 
 @app.route('/FOLI')
