@@ -25,7 +25,7 @@ JOLI_URL = os.environ.get('JOLI_URL', "http://data.itsfactory.fi/journeys/api/1/
 # Turku realtime siri feed
 FOLI_URL = os.environ.get('FOLI_URL', "http://data.foli.fi/siri/vm")
 # HSL realtime siri feed
-HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/navigator-server/v1/siriaccess/vm/json?operatorRef=HSL")
+HSL_URL = os.environ.get('HSL_URL', "http://api.digitransit.fi/realtime/vehicle-positions/v1/siriaccess/vm/json?operatorRef=HSL")
 # HSL area train GTFS-RT feed to merge the HSL data into
 TRAIN_URL = os.environ.get('TRAIN_URL', "http://api.digitransit.fi/realtime/raildigitraffic2gtfsrt/v1/hsl")
 # HSL area service-alerts GTFS-RT feed
