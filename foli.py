@@ -10,7 +10,7 @@ import pprint
 
 from gtfs_realtime_pb2 import FeedMessage, VehiclePosition
 
-GTFS_URL = 'http://dev.hsl.fi/gtfs.foli/foli.zip'
+GTFS_URL = 'https://data.foli.fi/gtfs/gtfs.zip'
 gtfs_timezone = pytz.timezone("Europe/Helsinki")
 
 zipdata = StringIO()
