@@ -57,9 +57,15 @@ def handle_journeys(raw):
         for rf in required_fields:
             if rf not in vehicle:
                 if rf == 'next_expecteddeparturetime' and 'next_aimeddeparturetime' in vehicle:
-                    vehicle['next_expecteddeparturetime'] = vehicle['next_aimeddeparturetime']
+                    if 'next_expectedarrivaltime' in vehicle and vehicle['next_expectedarrivaltime'] > vehicle['next_aimeddeparturetime']:
+                        vehicle['next_expecteddeparturetime'] = vehicle['next_expectedarrivaltime']
+                    else:
+                        vehicle['next_expecteddeparturetime'] = vehicle['next_aimeddeparturetime']
                 elif rf == 'next_expectedarrivaltime' and 'next_aimedarrivaltime' in vehicle:
-                    vehicle['next_expectedarrivaltime'] = vehicle['next_aimedarrivaltime']
+                    if 'next_expecteddeparturetime' in vehicle and vehicle['next_expecteddeparturetime'] < vehicle['next_aimedarrivaltime']:
+                        vehicle['next_expectedarrivaltime'] = vehicle['next_expecteddeparturetime']
+                    else:
+                        vehicle['next_expectedarrivaltime'] = vehicle['next_aimedarrivaltime']
                 else:
                     fields_not_found.append(rf)
 
