@@ -56,7 +56,18 @@ def handle_journeys(raw):
         fields_not_found = []
         for rf in required_fields:
             if rf not in vehicle:
-                fields_not_found.append(rf)
+                if rf == 'next_expecteddeparturetime' and 'next_aimeddeparturetime' in vehicle:
+                    if 'next_expectedarrivaltime' in vehicle and vehicle['next_expectedarrivaltime'] > vehicle['next_aimeddeparturetime']:
+                        vehicle['next_expecteddeparturetime'] = vehicle['next_expectedarrivaltime']
+                    else:
+                        vehicle['next_expecteddeparturetime'] = vehicle['next_aimeddeparturetime']
+                elif rf == 'next_expectedarrivaltime' and 'next_aimedarrivaltime' in vehicle:
+                    if 'next_expecteddeparturetime' in vehicle and vehicle['next_expecteddeparturetime'] < vehicle['next_aimedarrivaltime']:
+                        vehicle['next_expectedarrivaltime'] = vehicle['next_expecteddeparturetime']
+                    else:
+                        vehicle['next_expectedarrivaltime'] = vehicle['next_aimedarrivaltime']
+                else:
+                    fields_not_found.append(rf)
 
         if len(fields_not_found) > 0:
             logging.error("Fields missing from FOLI vehicle %s (%s)" % (i, ', '.join(fields_not_found)))
