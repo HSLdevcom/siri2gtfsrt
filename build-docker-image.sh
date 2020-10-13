@@ -1,34 +1,45 @@
 #!/bin/bash
-ORG=${ORG:-hsldevcom}
-DOCKER_IMAGE=siri2gtfsrt
 
-DOCKER_TAG="ci-${TRAVIS_COMMIT}"
 # Set these environment variables
 #DOCKER_EMAIL=
 #DOCKER_USER=
 #DOCKER_AUTH=
 
-function tagandpush {
-  docker tag $ORG/$DOCKER_IMAGE:$DOCKER_TAG $ORG/$DOCKER_IMAGE:$1
-  docker push $ORG/$DOCKER_IMAGE:$1
-}
+ORG=${ORG:-hsldevcom}
+DOCKER_IMAGE=$ORG/siri2gtfsrt
+DOCKER_TAG="latest"
+
+if [ "$TRAVIS_TAG" ]; then
+  DOCKER_TAG="prod"
+elif [ "$TRAVIS_BRANCH" != "master" ]; then
+  DOCKER_TAG=$TRAVIS_BRANCH
+fi
+
+DOCKER_TAG_LONG=$DOCKER_TAG-$(date +"%Y-%m-%dT%H.%M.%S")-${TRAVIS_COMMIT:0:7}
+DOCKER_IMAGE_LATEST=$DOCKER_IMAGE:latest
+DOCKER_IMAGE_TAG=$DOCKER_IMAGE:$DOCKER_TAG
+DOCKER_IMAGE_TAG_LONG=$DOCKER_IMAGE:$DOCKER_TAG_LONG
+
+if [ -z $TRAVIS_TAG ]; then
+  # Build image
+  echo "Building siri2gtfsrt"
+  docker build --tag="$DOCKER_IMAGE_TAG_LONG" .
+fi
 
 if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-
   docker login -u $DOCKER_USER -p $DOCKER_AUTH
   if [ "$TRAVIS_TAG" ];then
     echo "processing release $TRAVIS_TAG"
     #release do not rebuild, just tag
-    docker pull $ORG/$DOCKER_IMAGE:$DOCKER_TAG
-    tagandpush "prod"
+    docker pull $DOCKER_IMAGE_LATEST
+    docker tag $DOCKER_IMAGE_LATEST $DOCKER_IMAGE_TAG
+    docker tag $DOCKER_IMAGE_LATEST $DOCKER_IMAGE_TAG_LONG
+    docker push $DOCKER_IMAGE_TAG
+    docker push $DOCKER_IMAGE_TAG_LONG
   else
-    echo "processing master build $TRAVIS_COMMIT"
-    #master branch, build and tag as latest
-    docker build --tag="$ORG/$DOCKER_IMAGE:$DOCKER_TAG" .
-    docker push $ORG/$DOCKER_IMAGE:$DOCKER_TAG
-    tagandpush "latest"
+    echo "Pushing $DOCKER_TAG image"
+    docker push $DOCKER_IMAGE_TAG_LONG
+    docker tag $DOCKER_IMAGE_TAG_LONG $DOCKER_IMAGE_TAG
+    docker push $DOCKER_IMAGE_TAG
   fi
-else
-  echo "processing pr $TRAVIS_PULL_REQUEST"
-  docker build --tag="$ORG/$DOCKER_IMAGE:$DOCKER_TAG" .
 fi
