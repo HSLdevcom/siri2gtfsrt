@@ -1,8 +1,8 @@
-FROM python:2
+FROM python:3-alpine
 MAINTAINER Reittiopas version: 0.1
 
 RUN \
-  pip install transitfeed && \
+  pip install gtfs-realtime-bindings && \
   pip install protobuf && \
   pip install flask && \
   pip install python-dateutil && \
