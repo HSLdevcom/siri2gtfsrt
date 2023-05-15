@@ -2,14 +2,13 @@
 
 import logging
 
-import gtfs_realtime_pb2
 from google.protobuf import text_format
 from flask import Flask
 from flask import request
-from urllib2 import urlopen
+from urllib.request import urlopen
 import os
 import threading
-from StringIO import StringIO
+from io import BytesIO
 import gzip
 
 import foli
@@ -41,7 +40,7 @@ class Poll(object):
 
                 result = urlopen(self.url, timeout=60).read()
                 if self.gzipped:
-                    result = gzip.GzipFile(fileobj=StringIO(result)).read()
+                    result = gzip.GzipFile(fileobj=BytesIO(result)).read()
                 if self.fn is not None:
                     logging.debug("processing url %s", self.url)
                     self.result = self.fn(result)

@@ -1,25 +1,22 @@
 from datetime import datetime
 import json
 import logging
-from StringIO import StringIO
-from urllib2 import urlopen
+from io import BytesIO
+from urllib.request import urlopen
 import zipfile
 import pytz
 import csv
-import pprint
-
-from gtfs_realtime_pb2 import FeedMessage, VehiclePosition
+import codecs
+from google.transit import gtfs_realtime_pb2
 
 GTFS_URL = 'https://data.foli.fi/gtfs/gtfs.zip'
 gtfs_timezone = pytz.timezone("Europe/Helsinki")
 
-zipdata = StringIO()
-zipdata.write(urlopen(GTFS_URL).read())
-myzipfile = zipfile.ZipFile(zipdata)
+myzipfile = zipfile.ZipFile(BytesIO(urlopen(GTFS_URL).read()))
 
 routes = {}
 with myzipfile.open('routes.txt') as route_file:
-    routesreader = csv.reader(route_file, delimiter=',', quotechar='"')
+    routesreader = csv.reader(codecs.iterdecode(route_file, 'utf-8'), delimiter=',', quotechar='"')
     header = None
     for parts in routesreader:
         if not header:
@@ -44,12 +41,12 @@ def handle_journeys(raw):
     if data['status'] != "OK":
         logging.error("Foli status was not OK")
         return None
-    msg = FeedMessage()
+    msg = gtfs_realtime_pb2.FeedMessage()
     msg.header.gtfs_realtime_version = "1.0"
     msg.header.incrementality = msg.header.FULL_DATASET
     msg.header.timestamp = int(data['servertime'])
 
-    for i, vehicle in data['result']['vehicles'].iteritems():
+    for i, vehicle in data['result']['vehicles'].items():
         if 'monitored' not in vehicle or not vehicle['monitored']:
             continue
 
@@ -113,11 +110,11 @@ def handle_journeys(raw):
         # or if they are actually ever anything else than false.
         # Could be that UNKNOWN_CONGESTION_LEVEL should be always used.
         if vehicle['inpanic']:
-            ent.vehicle.congestion_level = VehiclePosition.SEVERE_CONGESTION
+            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.SEVERE_CONGESTION
         elif vehicle['incongestion']:
-            ent.vehicle.congestion_level = VehiclePosition.CONGESTION
+            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.CONGESTION
         else:
-            ent.vehicle.congestion_level = VehiclePosition.RUNNING_SMOOTHLY
+            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.RUNNING_SMOOTHLY
 
         # Seems like the vehicle is never marked as being on a stop
         # (vehicleatstop is always false)
