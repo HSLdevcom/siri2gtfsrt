@@ -96,16 +96,11 @@ def handle_journeys(raw):
         # Data seems to always have next stop, sometimes more in onwardcalls
         if 'onwardcalls' in vehicle:
             for onwardcall in vehicle['onwardcalls']:
-                stoptime = ent.trip_update.stop_time_update.add()
-                stoptime.stop_id = onwardcall['stoppointref']
-                if 'expectedarrivaltime' in onwardcall:
+                if 'stoppointref' in onwardcall and 'expecteddeparturetime' in onwardcall and 'expectedarrivaltime' in onwardcall:
+                    stoptime = ent.trip_update.stop_time_update.add()
+                    stoptime.stop_id = onwardcall['stoppointref']
                     stoptime.arrival.time = onwardcall['expectedarrivaltime']
-                else:
-                    stoptime.arrival.time = onwardcall['aimedarrivaltime']
-                if 'expecteddeparturetime' in onwardcall:
                     stoptime.departure.time = onwardcall['expecteddeparturetime']
-                else:
-                    stoptime.departure.time = onwardcall['aimeddeparturetime']
 
         ent.vehicle.trip.CopyFrom(ent.trip_update.trip)
         ent.vehicle.position.latitude = vehicle['latitude']
