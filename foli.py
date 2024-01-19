@@ -98,8 +98,14 @@ def handle_journeys(raw):
             for onwardcall in vehicle['onwardcalls']:
                 stoptime = ent.trip_update.stop_time_update.add()
                 stoptime.stop_id = onwardcall['stoppointref']
-                stoptime.arrival.time = onwardcall['expectedarrivaltime']
-                stoptime.departure.time = onwardcall['expecteddeparturetime']
+                if 'expectedarrivaltime' in onwardcall:
+                    stoptime.arrival.time = onwardcall['expectedarrivaltime']
+                else:
+                    stoptime.arrival.time = onwardcall['aimedarrivaltime']
+                if 'expecteddeparturetime' in onwardcall:
+                    stoptime.departure.time = onwardcall['expecteddeparturetime']
+                else:
+                    stoptime.departure.time = onwardcall['aimeddeparturetime']
 
         ent.vehicle.trip.CopyFrom(ent.trip_update.trip)
         ent.vehicle.position.latitude = vehicle['latitude']
