@@ -27,13 +27,8 @@ with myzipfile.open('routes.txt') as route_file:
         routes[routeinfo['route_short_name']] = routeinfo['route_id']
 
 
-def shortname_to_routeid(shortname):
-    return routes[shortname]
-
-
 required_fields = ('monitored', 'recordedattime', 'originaimeddeparturetime', 'lineref', 'directionref', 'vehicleref',
-                   'next_stoppointref', 'next_expectedarrivaltime', 'next_expecteddeparturetime', 'latitude',
-                   'longitude', 'inpanic', 'incongestion')
+                   'next_stoppointref', 'next_expectedarrivaltime', 'next_expecteddeparturetime')
 
 
 def handle_journeys(raw):
@@ -78,7 +73,10 @@ def handle_journeys(raw):
         start = datetime.fromtimestamp(vehicle['originaimeddeparturetime'], gtfs_timezone)
         ent.trip_update.trip.start_date = start.strftime('%Y%m%d')
         ent.trip_update.trip.start_time = start.strftime('%H:%M:%S')
-        ent.trip_update.trip.route_id = shortname_to_routeid(vehicle['lineref'])
+        if (vehicle['lineref'] not in routes):
+            logging.error("Route %s is not found in GTFS data" % (vehicle['lineref']))
+            continue
+        ent.trip_update.trip.route_id = routes[vehicle['lineref']]
         # The feed has 1 and 2 as direction values.
         # FOLI uses the opposite logic from HSL or Tampere: 2 is GTFS 0 and 1 is GTFS 1
         ent.trip_update.trip.direction_id = (int(vehicle['directionref']) - 2) % 2
@@ -101,23 +99,5 @@ def handle_journeys(raw):
                     stoptime.stop_id = onwardcall['stoppointref']
                     stoptime.arrival.time = onwardcall['expectedarrivaltime']
                     stoptime.departure.time = onwardcall['expecteddeparturetime']
-
-        ent.vehicle.trip.CopyFrom(ent.trip_update.trip)
-        ent.vehicle.position.latitude = vehicle['latitude']
-        ent.vehicle.position.longitude = vehicle['longitude']
-        # There doesn't seem to be bearing, odometer or speed information available
-
-        # It's just a guess if these booleans actually match these levels,
-        # or if they are actually ever anything else than false.
-        # Could be that UNKNOWN_CONGESTION_LEVEL should be always used.
-        if vehicle['inpanic']:
-            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.SEVERE_CONGESTION
-        elif vehicle['incongestion']:
-            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.CONGESTION
-        else:
-            ent.vehicle.congestion_level = gtfs_realtime_pb2.VehiclePosition.RUNNING_SMOOTHLY
-
-        # Seems like the vehicle is never marked as being on a stop
-        # (vehicleatstop is always false)
 
     return msg
