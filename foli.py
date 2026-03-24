@@ -1,33 +1,13 @@
 from datetime import datetime
 import json
 import logging
-from io import BytesIO
-from urllib.request import urlopen
-import zipfile
 import pytz
-import csv
-import codecs
 from google.transit import gtfs_realtime_pb2
 
-GTFS_URL = 'https://data.foli.fi/gtfs/gtfs.zip'
 gtfs_timezone = pytz.timezone("Europe/Helsinki")
 
-myzipfile = zipfile.ZipFile(BytesIO(urlopen(GTFS_URL).read()))
 
-routes = {}
-with myzipfile.open('routes.txt') as route_file:
-    routesreader = csv.reader(codecs.iterdecode(route_file, 'utf-8'), delimiter=',', quotechar='"')
-    header = None
-    for parts in routesreader:
-        if not header:
-            header = parts
-            continue
-
-        routeinfo = dict(zip(header, parts))
-        routes[routeinfo['route_short_name']] = routeinfo['route_id']
-
-
-required_fields = ('monitored', 'recordedattime', 'originaimeddeparturetime', 'lineref', 'directionref', 'vehicleref',
+required_fields = ('monitored', 'recordedattime', 'originaimeddeparturetime', '__tripref', 'vehicleref',
                    'next_stoppointref', 'next_expectedarrivaltime', 'next_expecteddeparturetime')
 
 
@@ -72,14 +52,7 @@ def handle_journeys(raw):
 
         start = datetime.fromtimestamp(vehicle['originaimeddeparturetime'], gtfs_timezone)
         ent.trip_update.trip.start_date = start.strftime('%Y%m%d')
-        ent.trip_update.trip.start_time = start.strftime('%H:%M:%S')
-        if (vehicle['lineref'] not in routes):
-            logging.error("Route %s is not found in GTFS data" % (vehicle['lineref']))
-            continue
-        ent.trip_update.trip.route_id = routes[vehicle['lineref']]
-        # The feed has 1 and 2 as direction values.
-        # FOLI uses the opposite logic from HSL or Tampere: 2 is GTFS 0 and 1 is GTFS 1
-        ent.trip_update.trip.direction_id = (int(vehicle['directionref']) - 2) % 2
+        ent.trip_update.trip.trip_id = vehicle['__tripref']
 
         # vehicleref isn't user friendly, but the same numbers seem to exist from day to day
         ent.trip_update.vehicle.id = vehicle['vehicleref']
