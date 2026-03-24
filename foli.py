@@ -1,12 +1,7 @@
 from datetime import datetime
 import json
 import logging
-from io import BytesIO
-from urllib.request import urlopen
-import zipfile
 import pytz
-import csv
-import codecs
 from google.transit import gtfs_realtime_pb2
 
 gtfs_timezone = pytz.timezone("Europe/Helsinki")
